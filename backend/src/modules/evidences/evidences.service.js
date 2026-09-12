@@ -24,10 +24,10 @@ class EvidencesService {
       throw new AppError('Không tìm thấy hồ sơ thành tích', 404, 'ACHIEVEMENT_NOT_FOUND');
     }
 
-    // Blueprint Rule 5: VERIFIED khóa nội dung & minh chứng, không cho thêm file mới vào hồ sơ đã duyệt
-    if (achievement.Status === ACHIEVEMENT_STATUS.VERIFIED) {
+    // Blueprint Rule 5: Chỉ DRAFT hoặc NEED_CORRECTION được phép thêm minh chứng
+    if (achievement.Status !== ACHIEVEMENT_STATUS.DRAFT && achievement.Status !== ACHIEVEMENT_STATUS.NEED_CORRECTION) {
       throw new AppError(
-        'Hồ sơ đã được xác nhận (VERIFIED) nên bị khóa, không thể thêm minh chứng',
+        `Chỉ có thể đính kèm minh chứng vào hồ sơ ở trạng thái Bản nháp (DRAFT) hoặc Cần bổ sung (NEED_CORRECTION). Trạng thái hiện tại: ${achievement.Status}`,
         400,
         'LOCKED_ACHIEVEMENT'
       );

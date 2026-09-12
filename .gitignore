@@ -38,9 +38,9 @@ backend/storage/*
 *.ntvs*
 *.njsproj
 *.sln
-*.sw?
-.DS_Store
-Thumbs.db
+# Temporary scratch scripts
+scratch/
+backend/scratch/
 
 # Testing coverage
 coverage/

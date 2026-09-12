@@ -55,9 +55,31 @@ async function deleteDraft(req, res, next) {
   }
 }
 
+async function update(req, res, next) {
+  try {
+    const expectedRowVersion = req.body.rowVersion || req.headers['if-match'];
+    const result = await achievementsService.update(parseInt(req.params.id, 10), req.body, req.user, expectedRowVersion);
+    return success(res, result, 'Cập nhật thông tin thành tích thành công', 200);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function cancel(req, res, next) {
+  try {
+    const expectedRowVersion = req.body.rowVersion || req.headers['if-match'];
+    const result = await achievementsService.cancel(parseInt(req.params.id, 10), req.body.reason, req.user, expectedRowVersion);
+    return success(res, result, 'Hủy hồ sơ thành tích thành công', 200);
+  } catch (err) {
+    next(err);
+  }
+}
+
 async function submit(req, res, next) {
   try {
-    const result = await achievementsService.submit(parseInt(req.params.id, 10), req.user);
+    const expectedRowVersion = req.body.rowVersion || req.headers['if-match'];
+    const notes = req.body.notes || null;
+    const result = await achievementsService.submit(parseInt(req.params.id, 10), req.user, notes, expectedRowVersion);
     return success(res, result, 'Nộp hồ sơ xét duyệt thành công', 200);
   } catch (err) {
     next(err);
@@ -79,6 +101,8 @@ module.exports = {
   findById,
   getTypes,
   deleteDraft,
+  update,
+  cancel,
   submit,
   getHistory,
 };

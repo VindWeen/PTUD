@@ -129,10 +129,132 @@ class AchievementsService {
     await achievementsRepository.deleteDraft(id);
   }
 
-  async submit(id, currentUser) {
+  async update(id, data, currentUser, expectedRowVersion) {
     const achievement = await achievementsRepository.findById(id);
     if (!achievement) {
       throw new AppError('Không tìm thấy hồ sơ thành tích', 404, 'NOT_FOUND');
+    }
+
+    // Blueprint Rule: Chỉ DRAFT hoặc NEED_CORRECTION được sửa
+    if (achievement.Status !== ACHIEVEMENT_STATUS.DRAFT && achievement.Status !== ACHIEVEMENT_STATUS.NEED_CORRECTION) {
+      throw new AppError(
+        `Chỉ có thể chỉnh sửa hồ sơ ở trạng thái Bản nháp (DRAFT) hoặc Cần bổ sung (NEED_CORRECTION). Trạng thái hiện tại: ${achievement.Status}`,
+        400,
+        'INVALID_STATUS_FOR_UPDATE'
+      );
+    }
+
+    if (achievement.CreatedBy !== currentUser.id && !currentUser.roles.includes(ROLES.ADMIN)) {
+      throw new AppError('Bạn không có quyền chỉnh sửa hồ sơ này', 403, 'FORBIDDEN');
+    }
+
+    const updated = await achievementsRepository.update(id, data, expectedRowVersion);
+    if (!updated) {
+      throw new AppError(
+        'Hồ sơ đã bị thay đổi bởi người dùng khác hoặc thao tác đồng thời. Vui lòng tải lại trang.',
+        409,
+        'CONCURRENCY_CONFLICT'
+      );
+    }
+
+    return updated;
+  }
+
+  async cancel(id, reason, currentUser, expectedRowVersion) {
+    const pool = await getPool();
+    const checkRes = await pool
+      .request()
+      .input('id', sql.Int, id)
+      .query(`
+        SELECT Id, Status, CreatedBy, CONVERT(VARCHAR(30), RowVersion, 1) AS RowVersion
+        FROM Achievements
+        WHERE Id = @id
+      `);
+
+    const achievement = checkRes.recordset[0];
+    if (!achievement) {
+      throw new AppError('Không tìm thấy hồ sơ thành tích', 404, 'NOT_FOUND');
+    }
+
+    if (
+      achievement.Status !== ACHIEVEMENT_STATUS.DRAFT &&
+      achievement.Status !== ACHIEVEMENT_STATUS.SUBMITTED &&
+      achievement.Status !== ACHIEVEMENT_STATUS.NEED_CORRECTION
+    ) {
+      throw new AppError(
+        `Không thể hủy hồ sơ đang ở trạng thái ${achievement.Status}`,
+        400,
+        'INVALID_STATUS_FOR_CANCEL'
+      );
+    }
+
+    if (achievement.CreatedBy !== currentUser.id && !currentUser.roles.includes(ROLES.ADMIN)) {
+      throw new AppError('Bạn không có quyền hủy hồ sơ này', 403, 'FORBIDDEN');
+    }
+
+    if (
+      (achievement.Status === ACHIEVEMENT_STATUS.SUBMITTED || achievement.Status === ACHIEVEMENT_STATUS.NEED_CORRECTION) &&
+      (!reason || !reason.trim())
+    ) {
+      throw new AppError('Vui lòng nhập lý do khi hủy hồ sơ đã nộp', 400, 'REASON_REQUIRED');
+    }
+
+    if (expectedRowVersion && achievement.RowVersion !== expectedRowVersion) {
+      throw new AppError(
+        'Hồ sơ đã bị thay đổi bởi người dùng khác hoặc thao tác đồng thời. Vui lòng tải lại trang.',
+        409,
+        'CONCURRENCY_CONFLICT'
+      );
+    }
+
+    const transaction = new sql.Transaction(pool);
+    await transaction.begin();
+
+    try {
+      const updateReq = new sql.Request(transaction);
+      updateReq.input('id', sql.Int, id);
+      await updateReq.query(`
+        UPDATE Achievements
+        SET Status = 'CANCELLED', UpdatedAt = SYSUTCDATETIME()
+        WHERE Id = @id
+      `);
+
+      const histReq = new sql.Request(transaction);
+      histReq.input('achievementId', sql.Int, id);
+      histReq.input('fromStatus', sql.NVarChar(30), achievement.Status);
+      histReq.input('toStatus', sql.NVarChar(30), ACHIEVEMENT_STATUS.CANCELLED);
+      histReq.input('actorId', sql.Int, currentUser.id);
+      histReq.input('reason', sql.NVarChar(sql.MAX), reason ? reason.trim() : 'Người kê khai hủy hồ sơ');
+
+      await histReq.query(`
+        INSERT INTO AchievementStatusHistories (AchievementId, FromStatus, ToStatus, ActorId, Reason)
+        VALUES (@achievementId, @fromStatus, @toStatus, @actorId, @reason)
+      `);
+
+      await transaction.commit();
+
+      return {
+        id,
+        status: ACHIEVEMENT_STATUS.CANCELLED,
+      };
+    } catch (err) {
+      await transaction.rollback();
+      throw err;
+    }
+  }
+
+  async submit(id, currentUser, notes = null, expectedRowVersion = null) {
+    const achievement = await achievementsRepository.findById(id);
+    if (!achievement) {
+      throw new AppError('Không tìm thấy hồ sơ thành tích', 404, 'NOT_FOUND');
+    }
+
+    if (expectedRowVersion && achievement.RowVersion !== expectedRowVersion) {
+      throw new AppError(
+        'Hồ sơ đã bị thay đổi bởi người dùng khác hoặc thao tác đồng thời. Vui lòng tải lại trang.',
+        409,
+        'CONCURRENCY_CONFLICT'
+      );
     }
 
     // Blueprint Rule 5: Chỉ nộp từ DRAFT hoặc NEED_CORRECTION
@@ -231,7 +353,12 @@ class AchievementsService {
       histReq.input('fromStatus', sql.NVarChar(30), achievement.Status);
       histReq.input('toStatus', sql.NVarChar(30), ACHIEVEMENT_STATUS.SUBMITTED);
       histReq.input('actorId', sql.Int, currentUser.id);
-      histReq.input('reason', sql.NVarChar(sql.MAX), `Nộp hồ sơ xét duyệt (Lần ${nextRevision})`);
+      const submitReason = notes && notes.trim()
+        ? notes.trim()
+        : (achievement.Status === ACHIEVEMENT_STATUS.NEED_CORRECTION
+            ? `Bổ sung và nộp lại hồ sơ xét duyệt (Lần ${nextRevision})`
+            : `Nộp hồ sơ xét duyệt (Lần ${nextRevision})`);
+      histReq.input('reason', sql.NVarChar(sql.MAX), submitReason);
 
       await histReq.query(`
         INSERT INTO AchievementStatusHistories (AchievementId, SubmissionId, FromStatus, ToStatus, ActorId, Reason)

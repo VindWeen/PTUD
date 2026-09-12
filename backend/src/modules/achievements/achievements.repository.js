@@ -43,6 +43,7 @@ class AchievementsRepository {
           a.Id, a.LecturerId, a.OrganizationUnitId, a.ContextUnitId, a.AchievementTypeId,
           a.Title, a.Description, a.StartDate, a.EndDate, a.RecognitionYear, a.AcademicYearId,
           a.Status, a.CreatedBy, a.SubmittedBy, a.CreatedAt, a.UpdatedAt,
+          CONVERT(VARCHAR(30), a.RowVersion, 1) AS RowVersion,
           t.Code AS TypeCode, t.Name AS TypeName, t.Category AS TypeCategory,
           u.FullName AS LecturerName, l.StaffCode AS LecturerStaffCode,
           o.Name AS UnitName, co.Name AS ContextUnitName,
@@ -133,6 +134,7 @@ class AchievementsRepository {
       SELECT 
         a.Id, a.LecturerId, a.OrganizationUnitId, a.ContextUnitId, a.AchievementTypeId,
         a.Title, a.Description, a.RecognitionYear, a.Status, a.CreatedAt,
+        CONVERT(VARCHAR(30), a.RowVersion, 1) AS RowVersion,
         t.Name AS TypeName, t.Category AS TypeCategory,
         u.FullName AS LecturerName,
         o.Name AS UnitName,
@@ -156,6 +158,45 @@ class AchievementsRepository {
       page,
       pageSize,
     };
+  }
+
+  async update(id, data, expectedRowVersion) {
+    const pool = await getPool();
+    const req = pool.request();
+    req.input('id', sql.Int, id);
+    req.input('title', sql.NVarChar(255), data.title);
+    req.input('description', sql.NVarChar(sql.MAX), data.description !== undefined ? data.description : null);
+    req.input('startDate', sql.Date, data.startDate || null);
+    req.input('endDate', sql.Date, data.endDate || null);
+    req.input('recognitionYear', sql.Int, data.recognitionYear);
+    req.input('academicYearId', sql.Int, data.academicYearId || null);
+    req.input('achievementTypeId', sql.Int, data.achievementTypeId);
+
+    let rowVersionCondition = '';
+    if (expectedRowVersion) {
+      req.input('rowVersion', sql.VarChar(30), expectedRowVersion);
+      rowVersionCondition = 'AND a.RowVersion = CONVERT(VARBINARY(8), @rowVersion, 1)';
+    }
+
+    const result = await req.query(`
+      UPDATE Achievements
+      SET 
+        Title = @title,
+        Description = @description,
+        StartDate = @startDate,
+        EndDate = @endDate,
+        RecognitionYear = @recognitionYear,
+        AcademicYearId = @academicYearId,
+        AchievementTypeId = @achievementTypeId,
+        UpdatedAt = SYSUTCDATETIME()
+      OUTPUT 
+        INSERTED.Id, INSERTED.Title, INSERTED.Status, INSERTED.RecognitionYear,
+        CONVERT(VARCHAR(30), INSERTED.RowVersion, 1) AS RowVersion
+      FROM Achievements a
+      WHERE a.Id = @id ${rowVersionCondition}
+    `);
+
+    return result.recordset[0] || null;
   }
 
   async deleteDraft(id) {
