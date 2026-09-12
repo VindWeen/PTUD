@@ -55,10 +55,30 @@ async function deleteDraft(req, res, next) {
   }
 }
 
+async function submit(req, res, next) {
+  try {
+    const result = await achievementsService.submit(parseInt(req.params.id, 10), req.user);
+    return success(res, result, 'Nộp hồ sơ xét duyệt thành công', 200);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function getHistory(req, res, next) {
+  try {
+    const result = await achievementsService.getHistory(parseInt(req.params.id, 10));
+    return success(res, result, 'Lịch sử chuyển đổi trạng thái thành tích', 200);
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   create,
   findAll,
   findById,
   getTypes,
   deleteDraft,
+  submit,
+  getHistory,
 };

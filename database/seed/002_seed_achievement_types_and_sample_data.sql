@@ -91,3 +91,32 @@ BEGIN
     VALUES (@LecturerId, @UnitId, '2020-01-01', 1, SYSUTCDATETIME());
 END;
 GO
+
+-- 5. Tạo tài khoản mẫu Trưởng khoa CNTT (Cán bộ Quản lý / Manager)
+-- Mật khẩu mặc định: Manager@123456 -> hash: $2b$10$yajBbHJDQ.A6iHY8jy.yg.wVJOAGC0DkE1e7QyrGc8yBzBzKQ1I6G
+IF NOT EXISTS (SELECT 1 FROM Users WHERE Username = 'truongkhoa')
+BEGIN
+    INSERT INTO Users (Username, Email, PasswordHash, FullName, IsActive, CreatedAt, UpdatedAt)
+    VALUES (
+        'truongkhoa',
+        'truongkhoa@lhu.edu.vn',
+        '$2b$10$yajBbHJDQ.A6iHY8jy.yg.wVJOAGC0DkE1e7QyrGc8yBzBzKQ1I6G',
+        N'TS. Trần Văn B (Trưởng Khoa CNTT)',
+        1,
+        SYSUTCDATETIME(),
+        SYSUTCDATETIME()
+    );
+
+    DECLARE @ManagerUserId INT = (SELECT Id FROM Users WHERE Username = 'truongkhoa');
+    DECLARE @ManagerRoleId INT = (SELECT Id FROM Roles WHERE Code = 'Manager');
+    DECLARE @FacultyUnitId INT = (SELECT Id FROM OrganizationUnits WHERE Code = 'K_CNTT');
+
+    -- Gán vai trò Manager
+    INSERT INTO UserRoles (UserId, RoleId, AssignedAt)
+    VALUES (@ManagerUserId, @ManagerRoleId, SYSUTCDATETIME());
+
+    -- Phân công phạm vi quản lý: Khoa CNTT và toàn bộ Bộ môn trực thuộc (IncludeDescendants = 1)
+    INSERT INTO UserUnitScopes (UserId, RoleId, UnitId, IncludeDescendants, ValidFrom)
+    VALUES (@ManagerUserId, @ManagerRoleId, @FacultyUnitId, 1, '2020-01-01');
+END;
+GO

@@ -22,6 +22,7 @@ import {
   ShieldCheck,
   Calendar,
   Layers,
+  Send,
 } from 'lucide-react';
 
 export default function Achievements() {
@@ -42,6 +43,7 @@ export default function Achievements() {
   // Modal states
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [detailAchievement, setDetailAchievement] = useState(null);
+  const [historyList, setHistoryList] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Form states
@@ -186,10 +188,35 @@ export default function Achievements() {
 
   const handleOpenDetail = async (id) => {
     try {
-      const res = await api.get(`/achievements/${id}`);
+      const [res, histRes] = await Promise.all([
+        api.get(`/achievements/${id}`),
+        api.get(`/achievements/${id}/history`).catch(() => ({ data: [] })),
+      ]);
       setDetailAchievement(res.data);
+      setHistoryList(histRes.data || []);
     } catch (err) {
       setFeedback({ type: 'error', text: 'Không thể lấy thông tin chi tiết.' });
+    }
+  };
+
+  const handleSubmitForApproval = async (id, title) => {
+    if (!window.confirm(`Bạn có chắc chắn muốn nộp hồ sơ "${title}" để Cán bộ quản lý xét duyệt? Sau khi nộp, hồ sơ sẽ chuyển sang trạng thái Chờ duyệt (SUBMITTED).`)) return;
+
+    try {
+      await api.post(`/achievements/${id}/submit`);
+      setFeedback({
+        type: 'success',
+        text: `Đã nộp thành công hồ sơ "${title}" để xét duyệt!`,
+      });
+      loadData();
+      if (detailAchievement?.Id === id) {
+        handleOpenDetail(id);
+      }
+    } catch (err) {
+      setFeedback({
+        type: 'error',
+        text: err.response?.data?.error?.message || err.message || 'Lỗi khi nộp hồ sơ xét duyệt',
+      });
     }
   };
 
@@ -497,13 +524,23 @@ export default function Achievements() {
 
                   <div className="flex items-center gap-1.5">
                     {item.Status === 'DRAFT' && (
-                      <button
-                        onClick={() => handleDeleteDraft(item.Id, item.Title)}
-                        title="Xóa bản nháp"
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      <>
+                        <button
+                          onClick={() => handleDeleteDraft(item.Id, item.Title)}
+                          title="Xóa bản nháp"
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleSubmitForApproval(item.Id, item.Title)}
+                          title="Nộp xét duyệt"
+                          className="px-2.5 py-1 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold transition-all flex items-center gap-1 shadow-xs"
+                        >
+                          <Send className="w-3 h-3" />
+                          <span>Nộp duyệt</span>
+                        </button>
+                      </>
                     )}
                     <button
                       onClick={() => handleOpenDetail(item.Id)}
@@ -899,30 +936,71 @@ export default function Achievements() {
               )}
             </div>
 
-            {/* If Draft, allow adding more evidence files */}
-            {detailAchievement.Status === 'DRAFT' && (
-              <div className="pt-4 border-t border-slate-100 dark:border-soft-darkBorder">
-                <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">
-                  Đính kèm thêm minh chứng số (Dành cho bản nháp)
-                </h4>
-                <form onSubmit={handleUploadExtraFile} className="flex flex-col sm:flex-row items-center gap-2">
-                  <input
-                    type="file"
-                    accept=".pdf,.docx,.doc,.jpg,.jpeg,.png"
-                    onChange={(e) => setExtraFile(e.target.files?.[0] || null)}
-                    className="text-xs text-slate-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-brand-50 file:text-brand-600 hover:file:bg-brand-100 dark:file:bg-brand-500/10 dark:file:text-brand-400 w-full"
-                  />
-                  <button
-                    type="submit"
-                    disabled={!extraFile || isUploadingExtra}
-                    className="soft-btn-primary text-xs py-2 px-4 whitespace-nowrap w-full sm:w-auto disabled:opacity-50"
-                  >
-                    <Upload className="w-3.5 h-3.5" />
-                    <span>{isUploadingExtra ? 'Đang tải...' : 'Upload'}</span>
-                  </button>
-                </form>
-              </div>
-            )}
+            {/* Status History Timeline */}
+            <div className="space-y-3 mb-6 pt-4 border-t border-slate-100 dark:border-soft-darkBorder">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                <Clock className="w-4 h-4 text-brand-500" />
+                Lịch sử Chuyển đổi Trạng thái ({historyList.length} sự kiện)
+              </h3>
+
+              {historyList.length === 0 ? (
+                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 text-slate-400 text-xs text-center">
+                  Hồ sơ đang ở trạng thái khởi tạo bản nháp.
+                </div>
+              ) : (
+                <div className="relative pl-6 space-y-4 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200 dark:before:bg-slate-700">
+                  {historyList.map((h) => (
+                    <div key={h.Id} className="relative text-xs space-y-1">
+                      <div className="absolute -left-6 top-1 w-4 h-4 rounded-full bg-brand-500 text-white flex items-center justify-center ring-4 ring-white dark:ring-soft-darkCard">
+                        {h.ToStatus === 'VERIFIED' ? (
+                          <CheckCircle2 className="w-3 h-3" />
+                        ) : (
+                          <Send className="w-2.5 h-2.5" />
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-slate-800 dark:text-slate-100">
+                          {h.ToStatus === 'VERIFIED' ? 'Đã xác nhận' : 'Đã nộp xét duyệt'}
+                        </span>
+                        <span className="text-[10px] text-slate-400">
+                          {new Date(h.CreatedAt).toLocaleString('vi-VN')}
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                        <span>Bởi: <strong>{h.ActorName}</strong> ({h.ActorRole || 'Người dùng'})</span>
+                      </div>
+                      {h.Reason && (
+                        <div className="text-[11px] text-slate-600 dark:text-slate-300 italic bg-slate-50 dark:bg-slate-800/50 p-2 rounded-lg">
+                          "{h.Reason}"
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Modal Bottom Actions */}
+            <div className="pt-4 border-t border-slate-100 dark:border-soft-darkBorder flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => setDetailAchievement(null)}
+                className="soft-btn-secondary text-xs"
+              >
+                Đóng
+              </button>
+
+              {detailAchievement.Status === 'DRAFT' && (
+                <button
+                  type="button"
+                  onClick={() => handleSubmitForApproval(detailAchievement.Id, detailAchievement.Title)}
+                  className="soft-btn-primary text-xs py-2 px-4 shadow-xs"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>Nộp hồ sơ xét duyệt</span>
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}
