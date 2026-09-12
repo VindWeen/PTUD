@@ -21,14 +21,14 @@ WHEN NOT MATCHED THEN
 GO
 
 -- 2. Khởi tạo tài khoản Admin mặc định (mật khẩu mặc định: Admin@123456)
--- Hash mẫu bcrypt của 'Admin@123456': $2a$10$7EqJtq98hPqEX7fNZaFWoO9p2Dhyk3JgY9M08vj7Yw4lDfg06m74a
+-- Hash bcrypt của 'Admin@123456': $2b$10$tYoBxi6T7Ya/qFl1ITHmGef57fo8Cdp9Rmjmk4uA5xw2W5/HFuSK6
 IF NOT EXISTS (SELECT 1 FROM Users WHERE Username = 'admin')
 BEGIN
     INSERT INTO Users (Username, Email, PasswordHash, FullName, IsActive, CreatedAt, UpdatedAt)
     VALUES (
         'admin',
         'admin@lhu.edu.vn',
-        '$2a$10$7EqJtq98hPqEX7fNZaFWoO9p2Dhyk3JgY9M08vj7Yw4lDfg06m74a',
+        '$2b$10$tYoBxi6T7Ya/qFl1ITHmGef57fo8Cdp9Rmjmk4uA5xw2W5/HFuSK6',
         N'Quản trị viên Hệ thống',
         1,
         SYSUTCDATETIME(),
@@ -44,5 +44,11 @@ BEGIN
         INSERT INTO UserRoles (UserId, RoleId, AssignedAt)
         VALUES (@AdminUserId, @AdminRoleId, SYSUTCDATETIME());
     END;
+END
+ELSE
+BEGIN
+    UPDATE Users
+    SET PasswordHash = '$2b$10$tYoBxi6T7Ya/qFl1ITHmGef57fo8Cdp9Rmjmk4uA5xw2W5/HFuSK6'
+    WHERE Username = 'admin';
 END;
 GO

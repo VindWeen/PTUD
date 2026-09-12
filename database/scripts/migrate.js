@@ -4,6 +4,13 @@
  */
 const fs = require('fs');
 const path = require('path');
+
+// Auto-resolve dependencies from backend/node_modules
+const backendNodeModules = path.resolve(__dirname, '../../backend/node_modules');
+if (fs.existsSync(backendNodeModules)) {
+  module.paths.unshift(backendNodeModules);
+}
+
 const sql = require('mssql');
 const dotenv = require('dotenv');
 
