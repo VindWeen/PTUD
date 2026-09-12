@@ -26,6 +26,10 @@ storage/*
 !storage/.gitignore
 uploads/*
 !uploads/.gitignore
+backend/src/storage/*
+!backend/src/storage/.gitkeep
+backend/storage/*
+!backend/storage/.gitkeep
 
 # IDE & OS
 .vscode/

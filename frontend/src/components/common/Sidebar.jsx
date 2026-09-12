@@ -17,10 +17,10 @@ export default function Sidebar() {
 
   const navItems = [
     { to: '/', icon: Home, label: 'Trang chủ' },
-    { to: '/profile', icon: Award, label: 'Hồ sơ năng lực' },
+    { to: '/achievements', icon: Award, label: 'Kê khai Thành tích' },
+    { to: '/profile', icon: User, label: 'Hồ sơ năng lực' },
     { to: '/approvals', icon: Calendar, label: 'Lịch xét duyệt' },
     { to: '/ai-forecast', icon: Cpu, label: 'Dự báo AI' },
-    { to: '/profile', icon: User, label: 'Tài khoản' },
   ];
 
   const handleLogout = async () => {
@@ -90,7 +90,7 @@ export default function Sidebar() {
           <Home className="w-5 h-5" />
         </NavLink>
         <NavLink
-          to="/profile"
+          to="/achievements"
           className={({ isActive }) =>
             `p-3 rounded-full transition-colors ${isActive ? 'text-white bg-white/15' : 'hover:text-white'}`
           }

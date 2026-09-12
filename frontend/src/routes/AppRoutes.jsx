@@ -2,6 +2,7 @@ import React from 'react';
 import { Routes, Route } from 'react-router-dom';
 import MainLayout from '../layouts/MainLayout';
 import Dashboard from '../pages/Dashboard';
+import Achievements from '../pages/Achievements';
 import ProfilePortfolio from '../pages/ProfilePortfolio';
 import AIForecast from '../pages/AIForecast';
 import Approvals from '../pages/Approvals';
@@ -16,6 +17,7 @@ export default function AppRoutes() {
       <Route path="/login" element={<Login />} />
       <Route path="/" element={<MainLayout />}>
         <Route index element={<Dashboard />} />
+        <Route path="achievements" element={<Achievements />} />
         <Route path="profile" element={<ProfilePortfolio />} />
         <Route path="ai-forecast" element={<AIForecast />} />
         <Route path="approvals" element={<Approvals />} />

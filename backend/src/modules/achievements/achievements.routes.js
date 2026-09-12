@@ -1,49 +1,26 @@
 const express = require('express');
+const { create, findAll, findById, getTypes, deleteDraft } = require('./achievements.controller');
+const { createAchievementSchema } = require('./achievements.validator');
+const validate = require('../../middlewares/validate.middleware');
 const { authenticate } = require('../../middlewares/auth.middleware');
-const { success } = require('../../utils/apiResponse');
 
 const router = express.Router();
 
 router.use(authenticate);
 
+// GET /api/v1/achievements/types (Danh mục loại thành tích)
+router.get('/types', getTypes);
+
 // GET /api/v1/achievements
-router.get('/', (req, res) => {
-  return success(res, [], 'Danh sách thành tích');
-});
+router.get('/', findAll);
 
 // POST /api/v1/achievements
-router.post('/', (req, res) => {
-  return success(res, { id: 1, ...req.body }, 'Tạo thành tích mới (DRAFT)', 201);
-});
+router.post('/', validate(createAchievementSchema), create);
 
 // GET /api/v1/achievements/:id
-router.get('/:id', (req, res) => {
-  return success(res, { id: req.params.id }, 'Chi tiết thành tích');
-});
+router.get('/:id', findById);
 
-// PATCH /api/v1/achievements/:id
-router.patch('/:id', (req, res) => {
-  return success(res, { id: req.params.id, ...req.body }, 'Cập nhật thành tích');
-});
-
-// DELETE /api/v1/achievements/:id
-router.delete('/:id', (req, res) => {
-  return success(res, null, 'Xóa bản nháp thành tích thành công');
-});
-
-// POST /api/v1/achievements/:id/submit
-router.post('/:id/submit', (req, res) => {
-  return success(res, { id: req.params.id, status: 'SUBMITTED' }, 'Gửi duyệt thành tích thành công');
-});
-
-// POST /api/v1/achievements/:id/cancel
-router.post('/:id/cancel', (req, res) => {
-  return success(res, { id: req.params.id, status: 'CANCELLED' }, 'Hủy nộp thành tích thành công');
-});
-
-// GET /api/v1/achievements/:id/history
-router.get('/:id/history', (req, res) => {
-  return success(res, [], 'Lịch sử thay đổi trạng thái thành tích');
-});
+// DELETE /api/v1/achievements/:id (Chỉ bản nháp DRAFT)
+router.delete('/:id', deleteDraft);
 
 module.exports = router;
