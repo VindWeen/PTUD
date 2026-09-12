@@ -1,26 +1,21 @@
 const express = require('express');
 const { authenticate } = require('../../middlewares/auth.middleware');
-const { success } = require('../../utils/apiResponse');
+const reportsController = require('./reports.controller');
 
 const router = express.Router();
 
 router.use(authenticate);
 
-// GET /api/v1/reports/achievements
-router.get('/achievements', (req, res) => {
-  return success(res, { summary: {}, items: [] }, 'Báo cáo thống kê thành tích');
-});
+// GET /api/v1/reports/summary (Dữ liệu tổng quan cho Dashboard cá nhân & đơn vị)
+router.get('/summary', reportsController.getDashboardSummary);
 
-// GET /api/v1/reports/awards
-router.get('/awards', (req, res) => {
-  return success(res, { summary: {}, items: [] }, 'Báo cáo thống kê khen thưởng');
-});
+// GET /api/v1/reports/achievements (Báo cáo chi tiết thành tích)
+router.get('/achievements', reportsController.getAchievementsReport);
 
-// GET /api/v1/reports/export
-router.get('/export', (req, res) => {
-  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-  res.setHeader('Content-Disposition', 'attachment; filename="bao-cao-thanh-tich.csv"');
-  return res.send('\uFEFFSTT,Chủ thể,Loại thành tích,Năm ghi nhận,Trạng thái\n');
-});
+// GET /api/v1/reports/awards (Báo cáo chi tiết khen thưởng)
+router.get('/awards', reportsController.getAwardsReport);
+
+// GET /api/v1/reports/export (Xuất file CSV an toàn chống CSV Injection)
+router.get('/export', reportsController.exportCsv);
 
 module.exports = router;
