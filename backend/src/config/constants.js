@@ -1,0 +1,40 @@
+/**
+ * Domain Constants and Enums based on PROJECT_DEVELOPMENT_BLUEPRINT.md
+ */
+
+const ROLES = {
+  LECTURER: 'Lecturer',
+  UNIT_REPRESENTATIVE: 'UnitRepresentative',
+  MANAGER: 'Manager',
+  RECORDS_OFFICER: 'RecordsOfficer',
+  ADMIN: 'Admin',
+  COUNCIL: 'Council',
+};
+
+const ACHIEVEMENT_STATUS = {
+  DRAFT: 'DRAFT',
+  SUBMITTED: 'SUBMITTED',
+  NEED_CORRECTION: 'NEED_CORRECTION',
+  VERIFIED: 'VERIFIED',
+  REJECTED: 'REJECTED',
+  CANCELLED: 'CANCELLED',
+  REVOKED: 'REVOKED',
+};
+
+const AWARD_STATUS = {
+  DRAFT: 'DRAFT',
+  RECORDED: 'RECORDED',
+  REVOKED: 'REVOKED',
+};
+
+const UNIT_TYPE = {
+  FACULTY: 'FACULTY',
+  DEPARTMENT: 'DEPARTMENT',
+};
+
+module.exports = {
+  ROLES,
+  ACHIEVEMENT_STATUS,
+  AWARD_STATUS,
+  UNIT_TYPE,
+};
