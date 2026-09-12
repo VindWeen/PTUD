@@ -1,35 +1,52 @@
 const express = require('express');
 const { authenticate, requireRoles } = require('../../middlewares/auth.middleware');
 const { ROLES } = require('../../config/constants');
-const { success } = require('../../utils/apiResponse');
+const { upload } = require('../../middlewares/upload.middleware');
+const {
+  getTypes,
+  getDecisions,
+  getDecisionById,
+  createDecision,
+  findAllRecords,
+  findRecordById,
+  createRecord,
+  updateRecord,
+  recordAward,
+  revokeAward,
+  getRecordHistory,
+} = require('./awards.controller');
 
 const router = express.Router();
 
 router.use(authenticate);
 
-// GET /api/v1/award-records
-router.get('/', (req, res) => {
-  return success(res, [], 'Danh sách kết quả khen thưởng đã ghi nhận');
-});
+// Danh mục loại khen thưởng
+router.get('/types', getTypes);
 
-// POST /api/v1/award-records (RecordsOfficer / Admin)
-router.post('/', requireRoles(ROLES.RECORDS_OFFICER, ROLES.ADMIN), (req, res) => {
-  return success(res, { id: 1, ...req.body }, 'Ghi nhận quyết định khen thưởng mới', 201);
-});
+// Danh sách & Chi tiết quyết định khen thưởng
+router.get('/decisions', getDecisions);
+router.get('/decisions/:id', getDecisionById);
+router.post('/decisions', requireRoles(ROLES.RECORDS_OFFICER, ROLES.ADMIN), upload.single('file'), createDecision);
 
-// PATCH /api/v1/award-records/:id
-router.patch('/:id', requireRoles(ROLES.RECORDS_OFFICER, ROLES.ADMIN), (req, res) => {
-  return success(res, { id: req.params.id, ...req.body }, 'Điều chỉnh bản ghi khen thưởng');
-});
+// Bản ghi Khen thưởng (AwardRecords) - Hỗ trợ cả 2 chuẩn route /awards/... và /award-records/...
+router.get('/', findAllRecords);
+router.get('/records', findAllRecords);
+router.post('/', requireRoles(ROLES.RECORDS_OFFICER, ROLES.ADMIN), createRecord);
+router.post('/records', requireRoles(ROLES.RECORDS_OFFICER, ROLES.ADMIN), createRecord);
 
-// POST /api/v1/award-records/:id/revoke
-router.post('/:id/revoke', requireRoles(ROLES.RECORDS_OFFICER, ROLES.ADMIN), (req, res) => {
-  return success(res, { id: req.params.id, status: 'REVOKED' }, 'Thu hồi quyết định khen thưởng thành công');
-});
+router.get('/:id', findRecordById);
+router.get('/records/:id', findRecordById);
 
-// GET /api/v1/award-records/:id/history
-router.get('/:id/history', (req, res) => {
-  return success(res, [], 'Lịch sử ghi nhận/thu hồi khen thưởng');
-});
+router.patch('/:id', requireRoles(ROLES.RECORDS_OFFICER, ROLES.ADMIN), updateRecord);
+router.patch('/records/:id', requireRoles(ROLES.RECORDS_OFFICER, ROLES.ADMIN), updateRecord);
+
+router.post('/:id/record', requireRoles(ROLES.RECORDS_OFFICER, ROLES.ADMIN), recordAward);
+router.post('/records/:id/record', requireRoles(ROLES.RECORDS_OFFICER, ROLES.ADMIN), recordAward);
+
+router.post('/:id/revoke', requireRoles(ROLES.RECORDS_OFFICER, ROLES.ADMIN), revokeAward);
+router.post('/records/:id/revoke', requireRoles(ROLES.RECORDS_OFFICER, ROLES.ADMIN), revokeAward);
+
+router.get('/:id/history', getRecordHistory);
+router.get('/records/:id/history', getRecordHistory);
 
 module.exports = router;

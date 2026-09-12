@@ -49,6 +49,7 @@ apiRouter.use('/lecturers', lecturersRoutes);
 apiRouter.use('/achievements', achievementsRoutes);
 apiRouter.use('/evidences', evidencesRoutes);
 apiRouter.use('/approvals', approvalsRoutes);
+apiRouter.use('/awards', awardsRoutes);
 apiRouter.use('/award-records', awardsRoutes);
 apiRouter.use('/reports', reportsRoutes);
 apiRouter.use('/notifications', notificationsRoutes);
