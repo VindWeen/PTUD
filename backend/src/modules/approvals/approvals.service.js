@@ -1,6 +1,7 @@
 const { getPool, sql } = require('../../config/database');
 const AppError = require('../../utils/appError');
 const { ACHIEVEMENT_STATUS, ROLES } = require('../../config/constants');
+const notifService = require('../notifications/notifications.service');
 
 class ApprovalsService {
   /**
@@ -259,6 +260,20 @@ class ApprovalsService {
 
       await transaction.commit();
 
+      try {
+        await notifService.sendNotification({
+          userId: achievement.CreatedBy,
+          title: 'Hồ sơ thành tích được xác nhận',
+          message: `Hồ sơ thành tích "${achievement.Title}" của bạn đã được xác nhận (VERIFIED).`,
+          type: 'SUCCESS',
+          relatedEntityType: 'ACHIEVEMENT',
+          relatedEntityId: achievementId,
+          actionUrl: '/achievements'
+        });
+      } catch (err) {
+        console.error('Failed to notify owner on verify:', err);
+      }
+
       return {
         id: achievementId,
         status: ACHIEVEMENT_STATUS.VERIFIED,
@@ -318,6 +333,20 @@ class ApprovalsService {
 
       await transaction.commit();
 
+      try {
+        await notifService.sendNotification({
+          userId: achievement.CreatedBy,
+          title: 'Yêu cầu bổ sung hồ sơ thành tích',
+          message: `Hồ sơ "${achievement.Title}" cần được bổ sung: "${reason.trim()}".`,
+          type: 'WARNING',
+          relatedEntityType: 'ACHIEVEMENT',
+          relatedEntityId: achievementId,
+          actionUrl: '/achievements'
+        });
+      } catch (err) {
+        console.error('Failed to notify owner on requestCorrection:', err);
+      }
+
       return {
         id: achievementId,
         status: ACHIEVEMENT_STATUS.NEED_CORRECTION,
@@ -376,6 +405,20 @@ class ApprovalsService {
 
       await transaction.commit();
 
+      try {
+        await notifService.sendNotification({
+          userId: achievement.CreatedBy,
+          title: 'Hồ sơ thành tích bị từ chối',
+          message: `Hồ sơ "${achievement.Title}" đã bị từ chối với lý do: "${reason.trim()}".`,
+          type: 'WARNING',
+          relatedEntityType: 'ACHIEVEMENT',
+          relatedEntityId: achievementId,
+          actionUrl: '/achievements'
+        });
+      } catch (err) {
+        console.error('Failed to notify owner on reject:', err);
+      }
+
       return {
         id: achievementId,
         status: ACHIEVEMENT_STATUS.REJECTED,
@@ -426,6 +469,20 @@ class ApprovalsService {
       `);
 
       await transaction.commit();
+
+      try {
+        await notifService.sendNotification({
+          userId: achievement.CreatedBy,
+          title: 'Hồ sơ thành tích đã bị thu hồi',
+          message: `Hồ sơ "${achievement.Title}" đã bị thu hồi với giải trình: "${reason.trim()}".`,
+          type: 'WARNING',
+          relatedEntityType: 'ACHIEVEMENT',
+          relatedEntityId: achievementId,
+          actionUrl: '/achievements'
+        });
+      } catch (err) {
+        console.error('Failed to notify owner on revoke:', err);
+      }
 
       return {
         id: achievementId,

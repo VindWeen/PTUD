@@ -2,6 +2,8 @@ const achievementsRepository = require('./achievements.repository');
 const { getPool, sql } = require('../../config/database');
 const AppError = require('../../utils/appError');
 const { ACHIEVEMENT_STATUS, ROLES } = require('../../config/constants');
+const orgService = require('../organizations/organizations.service');
+const notifService = require('../notifications/notifications.service');
 
 class AchievementsService {
   async getLecturerByUserId(userId) {
@@ -41,6 +43,18 @@ class AchievementsService {
         400,
         'INVALID_OWNER'
       );
+    }
+
+    // Blueprint Rule 2: Đại diện chỉ nộp cho đơn vị được giao, hết hạn thì mất quyền thao tác
+    if (hasUnit && !currentUser.roles.includes(ROLES.ADMIN)) {
+      const repValidation = await orgService.validateUnitRepresentative(currentUser.id, organizationUnitId);
+      if (!repValidation.isValid) {
+        throw new AppError(
+          repValidation.message || 'Bạn không có quyền đại diện kê khai thành tích cho đơn vị này (Rule 2)',
+          403,
+          repValidation.reason || 'FORBIDDEN_NOT_UNIT_REPRESENTATIVE'
+        );
+      }
     }
 
     // Tự động gán contextUnitId nếu chưa chọn
@@ -366,6 +380,22 @@ class AchievementsService {
       `);
 
       await transaction.commit();
+
+      // Bắn thông báo tự động cho các Manager phụ trách đơn vị
+      try {
+        await notifService.notifyUnitManagers({
+          unitId: achievement.ContextUnitId,
+          excludeUserId: currentUser.id,
+          title: 'Hồ sơ mới cần thẩm định',
+          message: `Hồ sơ thành tích "${achievement.Title}" vừa được nộp và đang chờ thẩm định (Lần ${nextRevision}).`,
+          type: 'ACTION_REQUIRED',
+          relatedEntityType: 'ACHIEVEMENT',
+          relatedEntityId: id,
+          actionUrl: '/approvals'
+        });
+      } catch (notifErr) {
+        console.error('Failed to send notification to managers:', notifErr);
+      }
 
       return {
         id,

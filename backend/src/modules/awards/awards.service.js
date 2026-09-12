@@ -4,6 +4,7 @@ const awardsRepository = require('./awards.repository');
 const { getPool, sql } = require('../../config/database');
 const AppError = require('../../utils/appError');
 const { ROLES } = require('../../config/constants');
+const notifService = require('../notifications/notifications.service');
 
 class AwardsService {
   calculateFileHash(filePath) {
@@ -144,6 +145,35 @@ class AwardsService {
       ? 'Nhập và ghi nhận chính thức quyết định khen thưởng'
       : 'Tạo bản nháp kết quả khen thưởng';
     await awardsRepository.createHistory(newRecord.Id, null, recordStatus, currentUser.id, historyReason);
+
+    // Tự động bắn thông báo chúc mừng vinh danh khen thưởng
+    if (recordStatus === 'RECORDED') {
+      try {
+        const pool = await getPool();
+        let targetUserId = null;
+        if (lecturerId) {
+          const lRes = await pool.request().input('lId', sql.Int, lecturerId).query('SELECT UserId FROM Lecturers WHERE Id = @lId');
+          targetUserId = lRes.recordset[0]?.UserId;
+        } else if (organizationUnitId) {
+          const repRes = await pool.request().input('uId', sql.Int, organizationUnitId).query('SELECT TOP 1 UserId FROM UnitRepresentatives WHERE UnitId = @uId AND IsActive = 1 ORDER BY CreatedAt DESC');
+          targetUserId = repRes.recordset[0]?.UserId;
+        }
+
+        if (targetUserId) {
+          await notifService.sendNotification({
+            userId: targetUserId,
+            title: 'Vinh danh Danh hiệu Khen thưởng',
+            message: `Bạn/Đơn vị của bạn đã được trao tặng danh hiệu thi đua mới theo Quyết định khen thưởng chính thức.`,
+            type: 'SUCCESS',
+            relatedEntityType: 'AWARD',
+            relatedEntityId: newRecord.Id,
+            actionUrl: '/awards'
+          });
+        }
+      } catch (notifErr) {
+        console.error('Failed to notify award recipient:', notifErr);
+      }
+    }
 
     return newRecord;
   }

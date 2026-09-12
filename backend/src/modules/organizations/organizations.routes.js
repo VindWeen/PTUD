@@ -1,37 +1,25 @@
 const express = require('express');
-const { authenticate } = require('../../middlewares/auth.middleware');
-const { success } = require('../../utils/apiResponse');
-
-const { getPool } = require('../../config/database');
+const { authenticate, requireRoles } = require('../../middlewares/auth.middleware');
+const { ROLES } = require('../../config/constants');
+const orgController = require('./organizations.controller');
 
 const router = express.Router();
 
 router.use(authenticate);
 
-// GET /api/v1/units (Lấy danh sách tất cả đơn vị tổ chức)
-router.get('/', async (req, res, next) => {
-  try {
-    const pool = await getPool();
-    const result = await pool.request().query(`
-      SELECT Id, Code, Name, Type, ParentId 
-      FROM OrganizationUnits 
-      WHERE IsActive = 1 
-      ORDER BY Type ASC, Name ASC
-    `);
-    return success(res, result.recordset, 'Danh sách đơn vị thành công');
-  } catch (err) {
-    next(err);
-  }
-});
+// 1. Quản lý Đơn vị Tổ chức (OrganizationUnits)
+router.get('/', orgController.getUnits);
+router.post('/', requireRoles(ROLES.ADMIN), orgController.createUnit);
+router.patch('/:id', requireRoles(ROLES.ADMIN), orgController.updateUnit);
 
-// GET /api/v1/units/:id/profile
-router.get('/:id/profile', (req, res) => {
-  return success(res, { id: req.params.id }, 'Hồ sơ đơn vị');
-});
+// 2. Quản lý Phân công Phạm vi Duyệt (UserUnitScopes)
+router.get('/scopes', requireRoles(ROLES.ADMIN, ROLES.MANAGER), orgController.getScopes);
+router.post('/scopes', requireRoles(ROLES.ADMIN), orgController.createScope);
+router.delete('/scopes/:id', requireRoles(ROLES.ADMIN), orgController.deleteScope);
 
-// GET /api/v1/units/:id/achievements
-router.get('/:id/achievements', (req, res) => {
-  return success(res, [], 'Danh sách thành tích tập thể của đơn vị');
-});
+// 3. Quản lý Đại diện Đơn vị (UnitRepresentatives)
+router.get('/representatives', requireRoles(ROLES.ADMIN, ROLES.MANAGER), orgController.getRepresentatives);
+router.post('/representatives', requireRoles(ROLES.ADMIN, ROLES.MANAGER), orgController.createRepresentative);
+router.delete('/representatives/:id', requireRoles(ROLES.ADMIN, ROLES.MANAGER), orgController.deactivateRepresentative);
 
 module.exports = router;
