@@ -26,7 +26,11 @@ import {
   RefreshCw,
   Landmark,
   Sparkles,
+  RotateCcw,
 } from 'lucide-react';
+import LoadingSkeleton from '../components/common/LoadingSkeleton';
+import EmptyState from '../components/common/EmptyState';
+import ErrorState from '../components/common/ErrorState';
 
 export default function Awards() {
   const { user } = useAuth();
@@ -41,6 +45,7 @@ export default function Awards() {
   const [units, setUnits] = useState([]);
   const [lecturers, setLecturers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [feedback, setFeedback] = useState(null);
 
   // Filters
@@ -87,6 +92,7 @@ export default function Awards() {
 
   const loadAllData = async () => {
     setLoading(true);
+    setError(null);
     try {
       const [recordsRes, decisionsRes, typesRes, unitsRes, lecturersRes] = await Promise.all([
         api.get('/award-records').catch(() => ({ data: [] })),
@@ -103,7 +109,9 @@ export default function Awards() {
       setLecturers(lecturersRes.data || []);
     } catch (err) {
       console.error('Lỗi nạp dữ liệu khen thưởng:', err);
-      setFeedback({ type: 'error', text: err.message || 'Không thể nạp dữ liệu khen thưởng' });
+      const errMsg = err.response?.data?.error?.message || err.message || 'Không thể nạp dữ liệu khen thưởng';
+      setError(errMsg);
+      setFeedback({ type: 'error', text: errMsg });
     } finally {
       setLoading(false);
     }
@@ -525,30 +533,28 @@ export default function Awards() {
       </div>
 
       {/* Main Content Area */}
-      {loading ? (
-        <div className="soft-card p-12 text-center text-slate-400 text-xs animate-pulse">
-          Đang nạp dữ liệu từ máy chủ...
-        </div>
+      {error ? (
+        <ErrorState message={error} onRetry={loadAllData} />
+      ) : loading ? (
+        <LoadingSkeleton type={activeTab === 'RECORDS' ? 'card' : 'table'} count={6} rows={6} />
       ) : activeTab === 'RECORDS' ? (
         filteredAwards.length === 0 ? (
-          <div className="soft-card p-12 text-center">
-            <div className="w-14 h-14 mx-auto rounded-3xl bg-amber-500/10 text-amber-500 flex items-center justify-center mb-4">
-              <Award className="w-7 h-7" />
-            </div>
-            <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">
-              Chưa có bản ghi khen thưởng nào phù hợp
-            </h3>
-            <p className="text-xs text-slate-400 max-w-sm mx-auto mt-1 mb-5">
-              Bắt đầu ghi nhận danh hiệu thi đua chính thức cho giảng viên hoặc tập thể đơn vị.
-            </p>
-            <button
-              onClick={() => setShowCreateRecordModal(true)}
-              className="soft-btn-primary text-xs py-2 px-4 inline-flex items-center gap-1.5"
-            >
-              <Sparkles className="w-4 h-4" />
-              <span>Ghi nhận ngay</span>
-            </button>
-          </div>
+          <EmptyState
+            icon={Award}
+            title={search || statusFilter || ownerFilter !== 'ALL' || yearFilter ? 'Không tìm thấy bản ghi khen thưởng phù hợp' : 'Chưa có bản ghi khen thưởng nào'}
+            description={
+              search || statusFilter || ownerFilter !== 'ALL' || yearFilter
+                ? 'Không tìm thấy danh hiệu khen thưởng nào khớp với các tiêu chí tìm kiếm và bộ lọc đang chọn.'
+                : 'Bắt đầu ghi nhận danh hiệu thi đua chính thức cho giảng viên hoặc tập thể đơn vị.'
+            }
+            actionLabel={search || statusFilter || ownerFilter !== 'ALL' || yearFilter ? 'Xóa bộ lọc' : 'Ghi nhận ngay'}
+            actionIcon={search || statusFilter || ownerFilter !== 'ALL' || yearFilter ? RotateCcw : Sparkles}
+            onAction={
+              search || statusFilter || ownerFilter !== 'ALL' || yearFilter
+                ? () => { setSearch(''); setStatusFilter(''); setOwnerFilter('ALL'); setYearFilter(''); }
+                : () => setShowCreateRecordModal(true)
+            }
+          />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredAwards.map((item) => (
@@ -633,8 +639,18 @@ export default function Awards() {
         )
       ) : (
         /* TAB DECISIONS */
-        <div className="space-y-3.5">
-          {decisions.map((dec) => (
+        decisions.length === 0 ? (
+          <EmptyState
+            icon={Landmark}
+            title="Chưa có quyết định ban hành nào"
+            description="Ban hành các văn bản quyết định khen thưởng chính thức từ Ban Giám hiệu để liên kết với danh sách người được khen thưởng."
+            actionLabel="Ban hành quyết định"
+            actionIcon={Plus}
+            onAction={() => setShowCreateDecisionModal(true)}
+          />
+        ) : (
+          <div className="space-y-3.5">
+            {decisions.map((dec) => (
             <div
               key={dec.Id}
               className="soft-card p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:shadow-soft-md transition-all duration-200"
@@ -688,6 +704,7 @@ export default function Awards() {
             </div>
           ))}
         </div>
+        )
       )}
 
       {/* ================= MODAL GHI NHẬN KHEN THƯỞNG MỚI ================= */}

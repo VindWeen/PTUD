@@ -26,6 +26,9 @@ import {
 import { useTheme } from '../hooks/useTheme';
 import { useAuth } from '../hooks/useAuth';
 import NotificationBell from '../components/common/NotificationBell';
+import { MetricSkeleton, TableSkeleton } from '../components/common/LoadingSkeleton';
+import EmptyState from '../components/common/EmptyState';
+import ErrorState from '../components/common/ErrorState';
 
 const API_BASE = 'http://localhost:5000/api/v1';
 
@@ -49,6 +52,7 @@ export default function AdminManagement() {
   const [scopes, setScopes] = useState([]);
   const [representatives, setRepresentatives] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   // Audit Logs State
   const [auditLogs, setAuditLogs] = useState([]);
@@ -474,8 +478,13 @@ export default function AdminManagement() {
       </div>
 
       {/* 4 KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        {/* KPI 1 */}
+      {error ? (
+        <ErrorState message={error} onRetry={loadAllData} />
+      ) : loading ? (
+        <MetricSkeleton count={4} />
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          {/* KPI 1 */}
         <div className="p-6 rounded-[28px] bg-white dark:bg-slate-900/80 border border-slate-100 dark:border-slate-800 shadow-soft-sm hover:shadow-soft-md transition-all">
           <div className="flex items-center justify-between mb-4">
             <div className="w-12 h-12 rounded-2xl bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center">
@@ -547,6 +556,7 @@ export default function AdminManagement() {
           </div>
         </div>
       </div>
+      )}
 
       {/* Tabs Navigation */}
       <div className="flex items-center gap-3 border-b border-slate-200 dark:border-slate-800 pb-1">
@@ -636,20 +646,31 @@ export default function AdminManagement() {
           </div>
 
           {/* Users Table */}
-          <div className="bg-white dark:bg-slate-900 rounded-[28px] border border-slate-100 dark:border-slate-800 shadow-soft-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-sm">
-                <thead>
-                  <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 text-slate-500 dark:text-slate-400 font-bold text-xs uppercase tracking-wider">
-                    <th className="py-4 px-5">Người dùng</th>
-                    <th className="py-4 px-5">Mã GV / Đơn vị</th>
-                    <th className="py-4 px-5">Vai trò hệ thống</th>
-                    <th className="py-4 px-5">Trạng thái</th>
-                    <th className="py-4 px-5 text-right">Tác vụ</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
-                  {users.map((u) => (
+          {loading ? (
+            <TableSkeleton rows={8} cols={5} />
+          ) : users.length === 0 ? (
+            <EmptyState
+              icon={Users}
+              title="Không tìm thấy người dùng phù hợp"
+              description="Thử thay đổi từ khóa tìm kiếm hoặc chọn vai trò khác để xem thêm kết quả."
+              actionLabel={userSearch || roleFilter || statusFilter ? 'Xóa bộ lọc' : undefined}
+              onAction={userSearch || roleFilter || statusFilter ? () => { setUserSearch(''); setRoleFilter(''); setStatusFilter(''); } : undefined}
+            />
+          ) : (
+            <div className="bg-white dark:bg-slate-900 rounded-[28px] border border-slate-100 dark:border-slate-800 shadow-soft-sm overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 text-slate-500 dark:text-slate-400 font-bold text-xs uppercase tracking-wider">
+                      <th className="py-4 px-5">Người dùng</th>
+                      <th className="py-4 px-5">Mã GV / Đơn vị</th>
+                      <th className="py-4 px-5">Vai trò hệ thống</th>
+                      <th className="py-4 px-5">Trạng thái</th>
+                      <th className="py-4 px-5 text-right">Tác vụ</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                    {users.map((u) => (
                     <tr key={u.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
                       <td className="py-4 px-5">
                         <div className="flex items-center gap-3">
@@ -747,6 +768,7 @@ export default function AdminManagement() {
               </table>
             </div>
           </div>
+          )}
         </div>
       )}
 
@@ -1108,14 +1130,20 @@ export default function AdminManagement() {
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
                   {auditLoading ? (
                     <tr>
-                      <td colSpan="6" className="py-8 text-center text-slate-400">
-                        Đang tải dữ liệu nhật ký kiểm toán...
+                      <td colSpan="6" className="p-4">
+                        <TableSkeleton rows={5} cols={6} />
                       </td>
                     </tr>
                   ) : auditLogs.length === 0 ? (
                     <tr>
-                      <td colSpan="6" className="py-12 text-center text-slate-400">
-                        Chưa có bản ghi nhật ký kiểm toán nào phù hợp với bộ lọc.
+                      <td colSpan="6" className="p-6">
+                        <EmptyState
+                          icon={History}
+                          title="Chưa có nhật ký kiểm toán phù hợp"
+                          description="Không tìm thấy bản ghi nhật ký kiểm toán nào theo bộ lọc hành động hoặc loại thực thể hiện tại."
+                          actionLabel={auditActionFilter || auditEntityFilter ? 'Xóa bộ lọc' : undefined}
+                          onAction={auditActionFilter || auditEntityFilter ? () => { setAuditActionFilter(''); setAuditEntityFilter(''); } : undefined}
+                        />
                       </td>
                     </tr>
                   ) : (

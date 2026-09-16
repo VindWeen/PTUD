@@ -16,9 +16,13 @@ import {
   Users,
   Trophy,
   ExternalLink,
+  RotateCcw,
 } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
 import NotificationBell from '../components/common/NotificationBell';
+import { TableSkeleton } from '../components/common/LoadingSkeleton';
+import EmptyState from '../components/common/EmptyState';
+import ErrorState from '../components/common/ErrorState';
 
 const API_BASE = 'http://localhost:5000/api/v1';
 
@@ -42,6 +46,7 @@ export default function Reports() {
   const [awards, setAwards] = useState([]);
   const [units, setUnits] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const [pagination, setPagination] = useState({ page: 1, pageSize: 20, total: 0 });
 
   const getHeaders = () => {
@@ -78,6 +83,7 @@ export default function Reports() {
 
   const fetchAchievementsReport = async () => {
     setLoading(true);
+    setError(null);
     try {
       let url = `${API_BASE}/reports/achievements?page=${pagination.page}&pageSize=${pagination.pageSize}`;
       if (yearFilter) url += `&year=${yearFilter}`;
@@ -90,9 +96,12 @@ export default function Reports() {
       if (data.success) {
         setAchievements(data.data.items || []);
         setPagination(data.data.pagination);
+      } else {
+        throw new Error(data.error?.message || 'Lỗi nạp báo cáo thành tích');
       }
     } catch (e) {
       console.error('Error fetching achievements report:', e);
+      setError(e.message || 'Không thể tải báo cáo thành tích.');
     } finally {
       setLoading(false);
     }
@@ -100,6 +109,7 @@ export default function Reports() {
 
   const fetchAwardsReport = async () => {
     setLoading(true);
+    setError(null);
     try {
       let url = `${API_BASE}/reports/awards?page=${pagination.page}&pageSize=${pagination.pageSize}`;
       if (yearFilter) url += `&year=${yearFilter}`;
@@ -110,9 +120,12 @@ export default function Reports() {
       if (data.success) {
         setAwards(data.data.items || []);
         setPagination(data.data.pagination);
+      } else {
+        throw new Error(data.error?.message || 'Lỗi nạp báo cáo khen thưởng');
       }
     } catch (e) {
       console.error('Error fetching awards report:', e);
+      setError(e.message || 'Không thể tải báo cáo khen thưởng.');
     } finally {
       setLoading(false);
     }
@@ -402,31 +415,41 @@ export default function Reports() {
 
       {/* 4. Data Tables */}
       <div className="bg-white dark:bg-slate-900 rounded-[28px] border border-slate-100 dark:border-slate-800 shadow-soft-sm overflow-hidden">
-        {loading ? (
-          <div className="py-16 text-center text-slate-400 text-sm">Đang tải dữ liệu báo cáo...</div>
+        {error ? (
+          <ErrorState message={error} onRetry={activeTab === 'achievements' ? fetchAchievementsReport : fetchAwardsReport} />
+        ) : loading ? (
+          <TableSkeleton rows={8} cols={6} />
         ) : activeTab === 'achievements' ? (
           /* Achievements Table */
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs">
-              <thead>
-                <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 text-slate-500 font-bold uppercase tracking-wider">
-                  <th className="py-4 px-5">Tên thành tích / Công trình</th>
-                  <th className="py-4 px-5">Chủ thể kê khai</th>
-                  <th className="py-4 px-5">Đơn vị bối cảnh (Ca 8)</th>
-                  <th className="py-4 px-5">Năm</th>
-                  <th className="py-4 px-5">Trạng thái</th>
-                  <th className="py-4 px-5 text-right">Minh chứng</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
-                {achievements.length === 0 ? (
-                  <tr>
-                    <td colSpan="6" className="py-12 text-center text-slate-400">
-                      Không tìm thấy bản ghi thành tích nào theo bộ lọc
-                    </td>
+          achievements.length === 0 ? (
+            <EmptyState
+              icon={BarChart3}
+              title="Không có dữ liệu thành tích phù hợp"
+              description="Không tìm thấy bản ghi thành tích nào theo bộ lọc năm, đơn vị hoặc trạng thái đang chọn."
+              actionLabel="Đặt lại bộ lọc"
+              actionIcon={RotateCcw}
+              onAction={() => {
+                setYearFilter('2024');
+                setUnitFilter('');
+                setCategoryFilter('');
+                setStatusFilter('');
+              }}
+            />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 text-slate-500 font-bold uppercase tracking-wider">
+                    <th className="py-4 px-5">Tên thành tích / Công trình</th>
+                    <th className="py-4 px-5">Chủ thể kê khai</th>
+                    <th className="py-4 px-5">Đơn vị bối cảnh (Ca 8)</th>
+                    <th className="py-4 px-5">Năm</th>
+                    <th className="py-4 px-5">Trạng thái</th>
+                    <th className="py-4 px-5 text-right">Minh chứng</th>
                   </tr>
-                ) : (
-                  achievements.map((a) => (
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                  {achievements.map((a) => (
                     <tr key={a.Id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors">
                       <td className="py-4 px-5">
                         <div className="font-bold text-slate-900 dark:text-white text-sm">
@@ -473,34 +496,40 @@ export default function Reports() {
                         </span>
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
         ) : (
           /* Awards Table */
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs">
-              <thead>
-                <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 text-slate-500 font-bold uppercase tracking-wider">
-                  <th className="py-4 px-5">Danh hiệu / Hình thức</th>
-                  <th className="py-4 px-5">Quyết định ban hành</th>
-                  <th className="py-4 px-5">Chủ thể thụ hưởng</th>
-                  <th className="py-4 px-5">Đơn vị bối cảnh</th>
-                  <th className="py-4 px-5">Năm</th>
-                  <th className="py-4 px-5 text-right">Trạng thái</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
-                {awards.length === 0 ? (
-                  <tr>
-                    <td colSpan="6" className="py-12 text-center text-slate-400">
-                      Không tìm thấy danh hiệu khen thưởng nào theo bộ lọc
-                    </td>
+          awards.length === 0 ? (
+            <EmptyState
+              icon={Trophy}
+              title="Không có dữ liệu khen thưởng phù hợp"
+              description="Không tìm thấy danh hiệu khen thưởng nào theo bộ lọc năm hoặc đơn vị đang chọn."
+              actionLabel="Đặt lại bộ lọc"
+              actionIcon={RotateCcw}
+              onAction={() => {
+                setYearFilter('2024');
+                setUnitFilter('');
+              }}
+            />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 text-slate-500 font-bold uppercase tracking-wider">
+                    <th className="py-4 px-5">Danh hiệu / Hình thức</th>
+                    <th className="py-4 px-5">Quyết định ban hành</th>
+                    <th className="py-4 px-5">Chủ thể thụ hưởng</th>
+                    <th className="py-4 px-5">Đơn vị bối cảnh</th>
+                    <th className="py-4 px-5">Năm</th>
+                    <th className="py-4 px-5 text-right">Trạng thái</th>
                   </tr>
-                ) : (
-                  awards.map((ar) => (
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                  {awards.map((ar) => (
                     <tr key={ar.Id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors">
                       <td className="py-4 px-5">
                         <div className="font-bold text-slate-900 dark:text-white text-sm">
@@ -549,11 +578,11 @@ export default function Reports() {
                         </span>
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
         )}
       </div>
     </div>

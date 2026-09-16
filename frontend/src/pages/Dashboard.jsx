@@ -25,6 +25,8 @@ import { useTheme } from '../hooks/useTheme';
 import { useAuth } from '../hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 import NotificationBell from '../components/common/NotificationBell';
+import { MetricSkeleton } from '../components/common/LoadingSkeleton';
+import ErrorState from '../components/common/ErrorState';
 
 export default function Dashboard() {
   const { isDark, toggleTheme } = useTheme();
@@ -57,6 +59,7 @@ export default function Dashboard() {
     yearlyTrend: [],
   });
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   // Calendar dates for Month 4 (April)
   const calendarDays = [
@@ -91,6 +94,8 @@ export default function Dashboard() {
   ];
 
   const fetchSummary = async () => {
+    setLoading(true);
+    setError(null);
     try {
       const token = localStorage.getItem('accessToken');
       if (!token) return;
@@ -101,9 +106,12 @@ export default function Dashboard() {
       const data = await res.json();
       if (data.success) {
         setSummaryData(data.data);
+      } else {
+        throw new Error(data.error?.message || 'Lỗi nạp dữ liệu tổng hợp');
       }
     } catch (e) {
       console.error('Failed to fetch dashboard summary:', e);
+      setError(e.message || 'Không thể kết nối đến máy chủ.');
     } finally {
       setLoading(false);
     }
@@ -273,8 +281,13 @@ export default function Dashboard() {
       </div>
 
       {/* 3. Real KPI Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        {/* Card 1: VERIFIED Achievements */}
+      {error ? (
+        <ErrorState message={error} onRetry={fetchSummary} />
+      ) : loading ? (
+        <MetricSkeleton count={4} />
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          {/* Card 1: VERIFIED Achievements */}
         <div className="p-6 rounded-[28px] bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-soft-sm hover:shadow-soft-md transition-all">
           <div className="flex items-center justify-between mb-3">
             <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold">
@@ -328,7 +341,25 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Card 4: Revoked Records */}
+          {/* Card 4: NEED_CORRECTION */}
+          <div className="p-6 rounded-[28px] bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-soft-sm hover:shadow-soft-md transition-all">
+            <div className="flex items-center justify-between mb-3">
+              <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center font-bold">
+                <Presentation className="w-6 h-6" />
+              </div>
+              <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400">
+                LƯU Ý
+              </span>
+            </div>
+            <div className="text-3xl font-black text-slate-900 dark:text-white">
+              {achievements.NeedCorrectionCount}
+            </div>
+            <div className="text-xs font-medium text-slate-500 dark:text-slate-400 mt-1">
+              Hồ sơ cần chỉnh sửa, bổ sung
+            </div>
+          </div>
+
+        {/* Card 5: Revoked Records */}
         <div className="p-6 rounded-[28px] bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-soft-sm hover:shadow-soft-md transition-all">
           <div className="flex items-center justify-between mb-3">
             <div className="w-12 h-12 rounded-2xl bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center justify-center font-bold">
@@ -346,6 +377,7 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+    )}
 
       {/* 4. Mini Calendar Section */}
       <div className="soft-card p-6">

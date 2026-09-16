@@ -23,6 +23,9 @@ import {
   History,
   CornerUpLeft,
 } from 'lucide-react';
+import LoadingSkeleton from '../components/common/LoadingSkeleton';
+import EmptyState from '../components/common/EmptyState';
+import ErrorState from '../components/common/ErrorState';
 
 export default function Approvals() {
   const { user } = useAuth();
@@ -33,6 +36,7 @@ export default function Approvals() {
   const [pendingList, setPendingList] = useState([]);
   const [verifiedList, setVerifiedList] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [feedback, setFeedback] = useState(null);
   const [search, setSearch] = useState('');
 
@@ -61,6 +65,7 @@ export default function Approvals() {
 
   const loadAllData = async () => {
     setLoading(true);
+    setError(null);
     try {
       const [pendingRes, verifiedRes] = await Promise.all([
         api.get('/approvals/pending').catch(() => ({ data: [] })),
@@ -70,9 +75,11 @@ export default function Approvals() {
       setVerifiedList(verifiedRes.data || []);
     } catch (err) {
       console.error('Lỗi nạp dữ liệu xét duyệt:', err);
+      const errMsg = err.response?.data?.error?.message || err.message || 'Không thể tải danh sách xét duyệt';
+      setError(errMsg);
       setFeedback({
         type: 'error',
-        text: err.response?.data?.error?.message || err.message || 'Không thể tải danh sách xét duyệt',
+        text: errMsg,
       });
     } finally {
       setLoading(false);
@@ -385,26 +392,24 @@ export default function Approvals() {
       </div>
 
       {/* Items List */}
-      {loading ? (
-        <div className="soft-card p-12 text-center text-slate-400 text-xs animate-pulse">
-          Đang nạp dữ liệu từ máy chủ...
-        </div>
+      {error ? (
+        <ErrorState message={error} onRetry={loadAllData} />
+      ) : loading ? (
+        <LoadingSkeleton type="table" rows={6} />
       ) : filteredItems.length === 0 ? (
-        <div className="soft-card p-12 text-center">
-          <div className="w-14 h-14 mx-auto rounded-3xl bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center mb-4 shadow-sm">
-            <CheckCircle2 className="w-7 h-7" />
-          </div>
-          <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">
-            {activeTab === 'PENDING' ? 'Hàng chờ xét duyệt hiện đang trống' : 'Chưa có hồ sơ nào được xác nhận'}
-          </h3>
-          <p className="text-xs text-slate-400 max-w-sm mx-auto mt-1">
-            {search
-              ? 'Không tìm thấy hồ sơ nào khớp với từ khóa tìm kiếm.'
+        <EmptyState
+          icon={CheckCircle2}
+          title={search ? 'Không tìm thấy hồ sơ phù hợp' : activeTab === 'PENDING' ? 'Hàng chờ xét duyệt hiện đang trống' : 'Chưa có hồ sơ nào được xác nhận'}
+          description={
+            search
+              ? 'Không tìm thấy hồ sơ nào khớp với từ khóa tìm kiếm. Thử tìm kiếm với từ khóa khác.'
               : activeTab === 'PENDING'
               ? 'Tất cả các hồ sơ thành tích trong phạm vi đơn vị phụ trách đã được xử lý xong!'
-              : 'Các hồ sơ sau khi được phê duyệt sẽ hiển thị tại danh sách này để quản lý và theo dõi.'}
-          </p>
-        </div>
+              : 'Các hồ sơ sau khi được phê duyệt sẽ hiển thị tại danh sách này để quản lý và theo dõi.'
+          }
+          actionLabel={search ? 'Xóa tìm kiếm' : undefined}
+          onAction={search ? () => setSearch('') : undefined}
+        />
       ) : (
         <div className="space-y-3.5">
           {filteredItems.map((item) => (

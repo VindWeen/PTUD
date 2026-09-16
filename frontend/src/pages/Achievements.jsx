@@ -28,6 +28,9 @@ import {
   RotateCcw,
   CornerUpLeft,
 } from 'lucide-react';
+import LoadingSkeleton from '../components/common/LoadingSkeleton';
+import EmptyState from '../components/common/EmptyState';
+import ErrorState from '../components/common/ErrorState';
 
 export default function Achievements() {
   const { user } = useAuth();
@@ -37,6 +40,7 @@ export default function Achievements() {
   const [types, setTypes] = useState([]);
   const [units, setUnits] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [feedback, setFeedback] = useState(null);
 
   // Filter states
@@ -97,6 +101,7 @@ export default function Achievements() {
 
   const loadData = async () => {
     setLoading(true);
+    setError(null);
     try {
       const [achieveRes, typesRes, unitsRes] = await Promise.all([
         api.get('/achievements'),
@@ -109,7 +114,9 @@ export default function Achievements() {
       setUnits(unitsRes.data || []);
     } catch (err) {
       console.error('Lỗi nạp dữ liệu:', err);
-      setFeedback({ type: 'error', text: err.message || 'Không thể tải danh sách thành tích.' });
+      const errMsg = err.response?.data?.error?.message || err.message || 'Không thể tải danh sách thành tích.';
+      setError(errMsg);
+      setFeedback({ type: 'error', text: errMsg });
     } finally {
       setLoading(false);
     }
@@ -612,29 +619,31 @@ export default function Achievements() {
       </div>
 
       {/* Main Grid Content */}
-      {loading ? (
-        <div className="soft-card p-12 text-center text-slate-400 text-xs animate-pulse">
-          Đang nạp dữ liệu hồ sơ thành tích...
-        </div>
+      {error ? (
+        <ErrorState message={error} onRetry={loadData} />
+      ) : loading ? (
+        <LoadingSkeleton type="card" count={6} />
       ) : filteredAchievements.length === 0 ? (
-        <div className="soft-card p-12 text-center">
-          <div className="w-14 h-14 mx-auto rounded-3xl bg-brand-500/10 text-brand-500 flex items-center justify-center mb-4">
-            <Award className="w-7 h-7" />
-          </div>
-          <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">
-            Chưa có hồ sơ thành tích nào
-          </h3>
-          <p className="text-xs text-slate-400 max-w-sm mx-auto mt-1 mb-5">
-            Bắt đầu bằng cách bấm nút "Kê khai thành tích mới" để lưu trữ các bài báo, đề tài và tài liệu minh chứng số an toàn.
-          </p>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="soft-btn-primary text-xs py-2 px-4 inline-flex items-center gap-1.5"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Kê khai ngay</span>
-          </button>
-        </div>
+        <EmptyState
+          icon={Award}
+          title={search || statusFilter || ownerFilter !== 'ALL' ? 'Không tìm thấy hồ sơ phù hợp' : 'Chưa có hồ sơ thành tích nào'}
+          description={
+            search || statusFilter || ownerFilter !== 'ALL'
+              ? 'Không có kết quả nào khớp với bộ lọc hiện tại. Thử xóa hoặc điều chỉnh bộ lọc để xem các hồ sơ khác.'
+              : 'Bắt đầu bằng cách bấm nút "Kê khai thành tích mới" để lưu trữ các bài báo, đề tài và tài liệu minh chứng số an toàn.'
+          }
+          actionLabel={search || statusFilter || ownerFilter !== 'ALL' ? 'Xóa bộ lọc' : 'Kê khai ngay'}
+          actionIcon={search || statusFilter || ownerFilter !== 'ALL' ? RotateCcw : Plus}
+          onAction={
+            search || statusFilter || ownerFilter !== 'ALL'
+              ? () => {
+                  setSearch('');
+                  setStatusFilter('');
+                  setOwnerFilter('ALL');
+                }
+              : () => setShowCreateModal(true)
+          }
+        />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredAchievements.map((item) => (
