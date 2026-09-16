@@ -1,5 +1,6 @@
 const bcrypt = require('bcryptjs');
 const userRepo = require('./users.repository');
+const auditService = require('../audit/audit.service');
 
 /**
  * Lấy danh sách người dùng
@@ -90,7 +91,18 @@ async function createUser(userData) {
     });
   }
 
-  return await userRepo.findUserById(newUser.Id);
+  const created = await userRepo.findUserById(newUser.Id);
+
+  await auditService.log({
+    userId: null,
+    action: 'USER_CREATE',
+    entityType: 'USER',
+    entityId: newUser.Id,
+    oldValues: null,
+    newValues: { username, email, fullName, roleIds, isLecturer },
+  });
+
+  return created;
 }
 
 /**
@@ -118,7 +130,18 @@ async function updateUser(id, updateData) {
     await userRepo.setUserRoles(id, roleIds);
   }
 
-  return await userRepo.findUserById(id);
+  const result = await userRepo.findUserById(id);
+
+  await auditService.log({
+    userId: null,
+    action: 'USER_UPDATE',
+    entityType: 'USER',
+    entityId: id,
+    oldValues: { fullName: existing.FullName, email: existing.Email, isActive: existing.IsActive },
+    newValues: { fullName, email, isActive, roleIds },
+  });
+
+  return result;
 }
 
 /**
@@ -141,7 +164,18 @@ async function assignRoles(id, roleIds) {
   }
 
   await userRepo.setUserRoles(id, roleIds);
-  return await userRepo.findUserById(id);
+  const result = await userRepo.findUserById(id);
+
+  await auditService.log({
+    userId: null,
+    action: 'ROLE_ASSIGN',
+    entityType: 'USER',
+    entityId: id,
+    oldValues: null,
+    newValues: { roleIds },
+  });
+
+  return result;
 }
 
 /**

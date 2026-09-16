@@ -2,6 +2,7 @@ const { getPool, sql } = require('../../config/database');
 const AppError = require('../../utils/appError');
 const { ACHIEVEMENT_STATUS, ROLES } = require('../../config/constants');
 const notifService = require('../notifications/notifications.service');
+const auditService = require('../audit/audit.service');
 
 class ApprovalsService {
   /**
@@ -274,6 +275,15 @@ class ApprovalsService {
         console.error('Failed to notify owner on verify:', err);
       }
 
+      await auditService.log({
+        userId: currentUser.id,
+        action: 'ACHIEVEMENT_VERIFY',
+        entityType: 'ACHIEVEMENT',
+        entityId: achievementId,
+        oldValues: { status: ACHIEVEMENT_STATUS.SUBMITTED },
+        newValues: { status: ACHIEVEMENT_STATUS.VERIFIED, reason: reason || null },
+      });
+
       return {
         id: achievementId,
         status: ACHIEVEMENT_STATUS.VERIFIED,
@@ -347,6 +357,15 @@ class ApprovalsService {
         console.error('Failed to notify owner on requestCorrection:', err);
       }
 
+      await auditService.log({
+        userId: currentUser.id,
+        action: 'ACHIEVEMENT_REQUEST_CORRECTION',
+        entityType: 'ACHIEVEMENT',
+        entityId: achievementId,
+        oldValues: { status: ACHIEVEMENT_STATUS.SUBMITTED },
+        newValues: { status: ACHIEVEMENT_STATUS.NEED_CORRECTION, reason: reason.trim() },
+      });
+
       return {
         id: achievementId,
         status: ACHIEVEMENT_STATUS.NEED_CORRECTION,
@@ -419,6 +438,15 @@ class ApprovalsService {
         console.error('Failed to notify owner on reject:', err);
       }
 
+      await auditService.log({
+        userId: currentUser.id,
+        action: 'ACHIEVEMENT_REJECT',
+        entityType: 'ACHIEVEMENT',
+        entityId: achievementId,
+        oldValues: { status: ACHIEVEMENT_STATUS.SUBMITTED },
+        newValues: { status: ACHIEVEMENT_STATUS.REJECTED, reason: reason.trim() },
+      });
+
       return {
         id: achievementId,
         status: ACHIEVEMENT_STATUS.REJECTED,
@@ -483,6 +511,15 @@ class ApprovalsService {
       } catch (err) {
         console.error('Failed to notify owner on revoke:', err);
       }
+
+      await auditService.log({
+        userId: currentUser.id,
+        action: 'ACHIEVEMENT_REVOKE',
+        entityType: 'ACHIEVEMENT',
+        entityId: achievementId,
+        oldValues: { status: ACHIEVEMENT_STATUS.VERIFIED },
+        newValues: { status: ACHIEVEMENT_STATUS.REVOKED, reason: reason.trim() },
+      });
 
       return {
         id: achievementId,

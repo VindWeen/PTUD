@@ -50,6 +50,18 @@ export default function AdminManagement() {
   const [representatives, setRepresentatives] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // Audit Logs State
+  const [auditLogs, setAuditLogs] = useState([]);
+  const [auditTotal, setAuditTotal] = useState(0);
+  const [auditPage, setAuditPage] = useState(1);
+  const [auditPageSize] = useState(15);
+  const [auditTotalPages, setAuditTotalPages] = useState(1);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [auditActionFilter, setAuditActionFilter] = useState('');
+  const [auditEntityFilter, setAuditEntityFilter] = useState('');
+  const [selectedLogForDetail, setSelectedLogForDetail] = useState(null);
+  const [showAuditDetailModal, setShowAuditDetailModal] = useState(false);
+
   // Filters & Search
   const [userSearch, setUserSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
@@ -188,9 +200,41 @@ export default function AdminManagement() {
     setLoading(false);
   };
 
+  const fetchAuditLogs = async () => {
+    setAuditLoading(true);
+    try {
+      const params = new URLSearchParams();
+      params.append('page', auditPage);
+      params.append('pageSize', auditPageSize);
+      if (auditActionFilter) params.append('action', auditActionFilter);
+      if (auditEntityFilter) params.append('entityType', auditEntityFilter);
+
+      const res = await fetch(`${API_BASE}/audit-logs?${params.toString()}`, {
+        headers: getHeaders(),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAuditLogs(data.data || []);
+        setAuditTotal(data.meta?.total || 0);
+        setAuditTotalPages(data.meta?.totalPages || 1);
+      }
+    } catch (e) {
+      console.error('Error fetching audit logs:', e);
+    } finally {
+      setAuditLoading(false);
+    }
+  };
+
   useEffect(() => {
     loadAllData();
+    fetchAuditLogs();
   }, []);
+
+  useEffect(() => {
+    if (activeTab === 'audit') {
+      fetchAuditLogs();
+    }
+  }, [activeTab, auditPage, auditActionFilter, auditEntityFilter]);
 
   useEffect(() => {
     fetchUsers();
@@ -538,6 +582,17 @@ export default function AdminManagement() {
         >
           <ShieldCheck className="w-4 h-4" />
           Phân công Thẩm định & Đại diện ({scopes.length + representatives.length})
+        </button>
+        <button
+          onClick={() => setActiveTab('audit')}
+          className={`px-5 py-3 rounded-2xl font-bold text-sm transition-all flex items-center gap-2 ${
+            activeTab === 'audit'
+              ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-md'
+              : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+          }`}
+        >
+          <Clock className="w-4 h-4" />
+          Nhật ký Kiểm toán ({auditTotal})
         </button>
       </div>
 
@@ -951,6 +1006,175 @@ export default function AdminManagement() {
                       </td>
                     </tr>
                   ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 4: AUDIT LOGS */}
+      {activeTab === 'audit' && (
+        <div className="space-y-5">
+          {/* Action Bar & Filter */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center gap-3 flex-1">
+              <select
+                value={auditActionFilter}
+                onChange={(e) => {
+                  setAuditActionFilter(e.target.value);
+                  setAuditPage(1);
+                }}
+                className="px-3.5 py-2.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-sm focus:outline-none shadow-soft-sm font-medium"
+              >
+                <option value="">Tất cả Hành động</option>
+                <option value="ACHIEVEMENT_VERIFY">Xác nhận Thành tích (VERIFY)</option>
+                <option value="ACHIEVEMENT_REQUEST_CORRECTION">Yêu cầu Bổ sung</option>
+                <option value="ACHIEVEMENT_REJECT">Từ chối Thành tích</option>
+                <option value="ACHIEVEMENT_REVOKE">Thu hồi Thành tích</option>
+                <option value="AWARD_RECORD_CREATE">Ghi nhận Khen thưởng</option>
+                <option value="AWARD_RECORD_REVOKE">Thu hồi Khen thưởng</option>
+                <option value="SCOPE_ASSIGN">Phân công Phạm vi Duyệt</option>
+                <option value="SCOPE_DELETE">Hủy Phạm vi Duyệt</option>
+                <option value="REPRESENTATIVE_ASSIGN">Bổ nhiệm Đại diện</option>
+                <option value="REPRESENTATIVE_DEACTIVATE">Hủy Đại diện</option>
+                <option value="USER_CREATE">Tạo Tài khoản Mới</option>
+                <option value="USER_UPDATE">Cập nhật Tài khoản</option>
+              </select>
+
+              <select
+                value={auditEntityFilter}
+                onChange={(e) => {
+                  setAuditEntityFilter(e.target.value);
+                  setAuditPage(1);
+                }}
+                className="px-3.5 py-2.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-sm focus:outline-none shadow-soft-sm font-medium"
+              >
+                <option value="">Tất cả Thực thể</option>
+                <option value="ACHIEVEMENT">Hồ sơ Thành tích</option>
+                <option value="AWARD_RECORD">Sổ Khen thưởng</option>
+                <option value="SCOPE">Phạm vi Duyệt</option>
+                <option value="REPRESENTATIVE">Đại diện Đơn vị</option>
+                <option value="USER">Người dùng</option>
+              </select>
+
+              <button
+                onClick={() => {
+                  setAuditActionFilter('');
+                  setAuditEntityFilter('');
+                  setAuditPage(1);
+                }}
+                className="px-3.5 py-2.5 rounded-2xl text-xs font-semibold text-slate-500 hover:text-slate-900 dark:hover:text-white bg-slate-100 dark:bg-slate-800/80 transition-colors"
+              >
+                Xóa bộ lọc
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2 self-end sm:self-auto">
+              <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                Trang {auditPage} / {auditTotalPages} ({auditTotal} nhật ký)
+              </span>
+              <button
+                disabled={auditPage <= 1 || auditLoading}
+                onClick={() => setAuditPage((p) => Math.max(1, p - 1))}
+                className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-semibold disabled:opacity-40 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all"
+              >
+                Trước
+              </button>
+              <button
+                disabled={auditPage >= auditTotalPages || auditLoading}
+                onClick={() => setAuditPage((p) => p + 1)}
+                className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-semibold disabled:opacity-40 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all"
+              >
+                Sau
+              </button>
+            </div>
+          </div>
+
+          {/* Audit Logs Table */}
+          <div className="rounded-[28px] bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 overflow-hidden shadow-soft-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-slate-50 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400 font-semibold text-xs border-b border-slate-100 dark:border-slate-800">
+                  <tr>
+                    <th className="py-3.5 px-4">Thời gian</th>
+                    <th className="py-3.5 px-4">Người thực hiện</th>
+                    <th className="py-3.5 px-4">Hành động</th>
+                    <th className="py-3.5 px-4">Đối tượng</th>
+                    <th className="py-3.5 px-4">Địa chỉ IP</th>
+                    <th className="py-3.5 px-4 text-right">Chi tiết</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                  {auditLoading ? (
+                    <tr>
+                      <td colSpan="6" className="py-8 text-center text-slate-400">
+                        Đang tải dữ liệu nhật ký kiểm toán...
+                      </td>
+                    </tr>
+                  ) : auditLogs.length === 0 ? (
+                    <tr>
+                      <td colSpan="6" className="py-12 text-center text-slate-400">
+                        Chưa có bản ghi nhật ký kiểm toán nào phù hợp với bộ lọc.
+                      </td>
+                    </tr>
+                  ) : (
+                    auditLogs.map((log) => {
+                      let badgeColor = 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300';
+                      if (log.Action.includes('VERIFY') || log.Action.includes('CONFIRM') || log.Action.includes('CREATE')) {
+                        badgeColor = 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/40';
+                      } else if (log.Action.includes('REVOKE') || log.Action.includes('REJECT') || log.Action.includes('DELETE')) {
+                        badgeColor = 'bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300 border border-rose-200 dark:border-rose-800/40';
+                      } else if (log.Action.includes('CORRECTION') || log.Action.includes('UPDATE')) {
+                        badgeColor = 'bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-200 dark:border-amber-800/40';
+                      } else if (log.Action.includes('ASSIGN')) {
+                        badgeColor = 'bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300 border border-blue-200 dark:border-blue-800/40';
+                      }
+
+                      return (
+                        <tr key={log.Id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
+                          <td className="py-3 px-4 font-mono text-xs text-slate-500">
+                            {new Date(log.CreatedAt).toLocaleString('vi-VN')}
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="font-semibold text-slate-900 dark:text-white text-xs">
+                              {log.FullName || 'Hệ thống'}
+                            </div>
+                            <div className="text-[10px] text-slate-400 font-mono">
+                              @{log.Username || 'system'}
+                            </div>
+                          </td>
+                          <td className="py-3 px-4">
+                            <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold inline-block ${badgeColor}`}>
+                              {log.Action}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="font-semibold text-xs text-slate-700 dark:text-slate-300">
+                              {log.EntityType}
+                            </div>
+                            <div className="text-[10px] text-slate-400 font-mono">
+                              ID: #{log.EntityId}
+                            </div>
+                          </td>
+                          <td className="py-3 px-4 text-xs font-mono text-slate-500">
+                            {log.IpAddress || 'localhost'}
+                          </td>
+                          <td className="py-3 px-4 text-right">
+                            <button
+                              onClick={() => {
+                                setSelectedLogForDetail(log);
+                                setShowAuditDetailModal(true);
+                              }}
+                              className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-brand-50 hover:text-brand-600 dark:bg-slate-800 dark:hover:bg-brand-950/50 dark:hover:text-brand-400 text-xs font-semibold text-slate-700 dark:text-slate-300 transition-all"
+                            >
+                              Xem Diff
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
                 </tbody>
               </table>
             </div>
@@ -1417,6 +1641,81 @@ export default function AdminManagement() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: AUDIT LOG DETAIL & JSON DIFF */}
+      {showAuditDetailModal && selectedLogForDetail && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-[32px] p-6 max-w-2xl w-full border border-slate-100 dark:border-slate-800 shadow-soft-2xl animate-in zoom-in-95 max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <Clock className="w-5 h-5 text-brand-600 dark:text-brand-400" />
+                  Chi tiết Nhật ký Kiểm toán #{selectedLogForDetail.Id}
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Hành động: <strong className="text-brand-600">{selectedLogForDetail.Action}</strong> | Thời gian: {new Date(selectedLogForDetail.CreatedAt).toLocaleString('vi-VN')}
+                </p>
+              </div>
+              <button
+                onClick={() => setShowAuditDetailModal(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-900 dark:hover:text-white flex items-center justify-center"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="overflow-y-auto py-4 space-y-4 text-xs flex-1">
+              <div className="grid grid-cols-2 gap-3 p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/50">
+                <div>
+                  <span className="text-slate-400 block mb-0.5">Người thực hiện</span>
+                  <span className="font-semibold text-slate-800 dark:text-slate-200">
+                    {selectedLogForDetail.FullName} (@{selectedLogForDetail.Username})
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-400 block mb-0.5">Thực thể tác động</span>
+                  <span className="font-semibold text-slate-800 dark:text-slate-200">
+                    {selectedLogForDetail.EntityType} #{selectedLogForDetail.EntityId}
+                  </span>
+                </div>
+              </div>
+
+              {/* Diff View */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <div className="font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1.5 text-xs">
+                    <span className="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block"></span>
+                    Dữ liệu trước (Old Values)
+                  </div>
+                  <pre className="p-3.5 rounded-2xl bg-slate-900 text-amber-200 font-mono text-[11px] overflow-x-auto max-h-60">
+                    {selectedLogForDetail.OldValues ? JSON.stringify(selectedLogForDetail.OldValues, null, 2) : 'null (Khởi tạo mới)'}
+                  </pre>
+                </div>
+
+                <div>
+                  <div className="font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1.5 text-xs">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 inline-block"></span>
+                    Dữ liệu sau (New Values)
+                  </div>
+                  <pre className="p-3.5 rounded-2xl bg-slate-900 text-emerald-200 font-mono text-[11px] overflow-x-auto max-h-60">
+                    {selectedLogForDetail.NewValues ? JSON.stringify(selectedLogForDetail.NewValues, null, 2) : 'null (Xóa / Hủy)'}
+                  </pre>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowAuditDetailModal(false)}
+                className="px-5 py-2.5 rounded-2xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-semibold text-xs shadow-md"
+              >
+                Đóng
+              </button>
+            </div>
           </div>
         </div>
       )}

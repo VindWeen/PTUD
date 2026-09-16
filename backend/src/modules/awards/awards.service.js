@@ -5,6 +5,7 @@ const { getPool, sql } = require('../../config/database');
 const AppError = require('../../utils/appError');
 const { ROLES } = require('../../config/constants');
 const notifService = require('../notifications/notifications.service');
+const auditService = require('../audit/audit.service');
 
 class AwardsService {
   calculateFileHash(filePath) {
@@ -175,6 +176,17 @@ class AwardsService {
       }
     }
 
+    if (recordStatus === 'RECORDED') {
+      await auditService.log({
+        userId: currentUser.id,
+        action: 'AWARD_RECORD_CREATE',
+        entityType: 'AWARD_RECORD',
+        entityId: newRecord.Id,
+        oldValues: null,
+        newValues: { decisionId, awardTypeId, lecturerId, organizationUnitId, status: 'RECORDED' },
+      });
+    }
+
     return newRecord;
   }
 
@@ -280,6 +292,16 @@ class AwardsService {
     }
 
     await awardsRepository.createHistory(id, 'DRAFT', 'RECORDED', currentUser.id, 'Chính thức ghi nhận kết quả khen thưởng');
+
+    await auditService.log({
+      userId: currentUser.id,
+      action: 'AWARD_RECORD_CONFIRM',
+      entityType: 'AWARD_RECORD',
+      entityId: id,
+      oldValues: { status: 'DRAFT' },
+      newValues: { status: 'RECORDED' },
+    });
+
     return updated;
   }
 
@@ -307,6 +329,16 @@ class AwardsService {
     }
 
     await awardsRepository.createHistory(id, 'RECORDED', 'REVOKED', currentUser.id, reason.trim());
+
+    await auditService.log({
+      userId: currentUser.id,
+      action: 'AWARD_RECORD_REVOKE',
+      entityType: 'AWARD_RECORD',
+      entityId: id,
+      oldValues: { status: 'RECORDED' },
+      newValues: { status: 'REVOKED', reason: reason.trim() },
+    });
+
     return updated;
   }
 

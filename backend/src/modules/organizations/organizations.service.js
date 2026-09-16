@@ -1,5 +1,6 @@
 const orgRepo = require('./organizations.repository');
 const notifService = require('../notifications/notifications.service');
+const auditService = require('../audit/audit.service');
 
 /**
  * Lấy danh sách đơn vị tổ chức
@@ -74,6 +75,15 @@ async function createScope(data) {
     actionUrl: '/approvals'
   });
 
+  await auditService.log({
+    userId: null,
+    action: 'SCOPE_ASSIGN',
+    entityType: 'SCOPE',
+    entityId: scope.id || scope.Id,
+    oldValues: null,
+    newValues: { userId, roleId, unitId, includeDescendants, validFrom, validTo },
+  });
+
   return scope;
 }
 
@@ -88,6 +98,16 @@ async function deleteScope(id) {
     error.errorCode = 'SCOPE_NOT_FOUND';
     throw error;
   }
+
+  await auditService.log({
+    userId: null,
+    action: 'SCOPE_DELETE',
+    entityType: 'SCOPE',
+    entityId: id,
+    oldValues: { id },
+    newValues: null,
+  });
+
   return { id, deleted: true };
 }
 
@@ -129,6 +149,15 @@ async function createRepresentative(data, assignedBy) {
     actionUrl: '/achievements'
   });
 
+  await auditService.log({
+    userId: assignedBy || null,
+    action: 'REPRESENTATIVE_ASSIGN',
+    entityType: 'REPRESENTATIVE',
+    entityId: rep.id || rep.Id,
+    oldValues: null,
+    newValues: { userId, unitId, validFrom, validTo, notes },
+  });
+
   return rep;
 }
 
@@ -143,6 +172,16 @@ async function deactivateRepresentative(id) {
     error.errorCode = 'REPRESENTATIVE_NOT_FOUND';
     throw error;
   }
+
+  await auditService.log({
+    userId: null,
+    action: 'REPRESENTATIVE_DEACTIVATE',
+    entityType: 'REPRESENTATIVE',
+    entityId: id,
+    oldValues: { id, isActive: 1 },
+    newValues: { id, isActive: 0 },
+  });
+
   return updated;
 }
 
